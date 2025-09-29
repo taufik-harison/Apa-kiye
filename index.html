@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi APA KiYE ?</title>
+
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet JS & CSS for mapping -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+    <!-- Leaflet Routing Machine for route calculation -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <!-- SheetJS for Excel file handling -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        /* Custom styles to complement Tailwind */
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Prevent scrolling of the whole page */
+        }
+        #map {
+            height: 100%; /* Adjusted for new container */
+            width: 100%;
+            z-index: 10;
+        }
+        /* Custom styling for Leaflet popups */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .leaflet-popup-content {
+            margin: 15px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        /* Custom scrollbar for the sidebar */
+        .sidebar-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #9CA3AF #F3F4F6;
+        }
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background: #F3F4F6;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background-color: #9CA3AF;
+            border-radius: 20px;
+            border: 3px solid #F3F4F6;
+        }
+        /* Active state for employee list */
+        .employee-item.active {
+            background-color: #EBF4FF; /* A light blue color */
+            border-left-color: #3B82F6; /* Blue-500 */
+        }
+        /* Hide the default routing instructions panel */
+        .leaflet-routing-container {
+            display: none;
+        }
+        /* Style for active view toggle button */
+        .active-view-btn {
+            background-color: #EBF4FF !important;
+            color: #1D4ED8 !important;
+            border-color: #93C5FD !important;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Login Screen -->
+    <div id="login-container" class="fixed inset-0 bg-gray-100 z-50 flex items-center justify-center">
+        <div class="w-full max-w-sm p-8 bg-white rounded-lg shadow-lg">
+            <div class="text-center mb-6">
+                <i class="fas fa-map-marked-alt text-blue-600 text-4xl mb-3"></i>
+                <h1 class="text-2xl font-bold text-gray-800">APA KiYE ?</h1>
+                <p class="text-sm text-gray-500">Silakan login untuk melanjutkan</p>
+            </div>
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="username" class="block text-sm font-medium text-gray-700">User</label>
+                    <input type="text" id="username" name="username" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div class="mb-6">
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="password" name="password" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <p id="login-error" class="text-red-500 text-sm text-center mb-4 hidden">User atau password salah.</p>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-300">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div id="app-container" class="hidden">
+        <div class="flex h-screen">
+            <!-- Sidebar for employee list and profile -->
+            <aside class="w-full md:w-96 bg-white shadow-lg flex flex-col z-20">
+                <div class="p-4 border-b flex justify-between items-center bg-blue-600 text-white">
+                    <div>
+                        <h1 class="text-xl font-bold"><i class="fas fa-map-marked-alt mr-2"></i>APA KiYE ?</h1>
+                        <p class="text-sm text-blue-100">Aplikasi Pendukung Atasan <br> Knowing Your Employee</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="settings-btn" class="text-blue-100 p-2 rounded-full hover:bg-blue-700 hover:text-white transition" title="Pengaturan Kantor">
+                            <i class="fas fa-cog fa-lg"></i>
+                        </button>
+                        <button id="logout-btn" class="text-blue-100 p-2 rounded-full hover:bg-red-500 hover:text-white transition" title="Logout">
+                            <i class="fas fa-sign-out-alt fa-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Office Profile Header -->
+                <div id="office-profile-header" class="p-4 border-b flex items-center space-x-4 bg-gray-50">
+                    <img id="office-header-photo" src="" alt="Foto Kantor" class="w-12 h-12 rounded-md object-cover shadow">
+                    <div>
+                        <p id="office-header-name" class="font-semibold text-gray-800 text-sm"></p>
+                        <p id="office-header-address" class="text-xs text-gray-600"></p>
+                    </div>
+                </div>
+                
+                <!-- Employee Profile Display -->
+                <div id="profile-card" class="relative p-5 border-b text-center hidden overflow-y-auto">
+                    <button id="close-profile-btn" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                    <img id="profile-photo" src="" alt="Foto Profil" class="w-24 h-24 rounded-full mx-auto mb-3 object-cover shadow-md">
+                    <div class="flex justify-center items-center gap-2">
+                        <h2 id="profile-name" class="text-lg font-bold text-gray-900"></h2>
+                        <button id="edit-profile-btn" class="text-blue-500 hover:text-blue-700 text-xs" title="Edit Pegawai"><i class="fas fa-pencil-alt"></i></button>
+                    </div>
+                    <p id="profile-position" class="text-sm text-gray-600"></p>
+                    
+                    <!-- New Profile Details -->
+                    <div class="mt-4 p-3 bg-gray-50 rounded-lg text-left space-y-2">
+                        <p class="text-sm font-medium text-gray-700">Nama Panggilan: <span id="profile-nickname" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">TTL: <span id="profile-dob" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700"><i class="fas fa-phone-alt w-4 text-center mr-2 text-blue-500"></i>No. HP: <span id="profile-phone" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">Gol. Darah: <span id="profile-blood-type" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">Status: <span id="profile-marital-status" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">Agama: <span id="profile-religion" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">Medsos: <a id="profile-social-media" href="#" target="_blank" class="font-normal text-blue-600 hover:underline"></a></p>
+                        <p class="text-sm font-medium text-gray-700">Hobi: <span id="profile-hobby" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">Favorit: <span id="profile-favorite" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">Pendidikan Terakhir: <span id="profile-last-education" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">Riwayat Sakit: <span id="profile-medical-history" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">Pangkat/Gol: <span id="profile-pangkat-gol" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">Tgl. Mutasi: <span id="profile-tanggal-mutasi" class="font-normal"></span></p>
+                        <p class="text-sm font-medium text-gray-700">Ukuran Kaos: <span id="profile-ukuran-kaos" class="font-normal"></span></p>
+                    </div>
+
+                    <!-- Location and Route Details -->
+                    <div class="mt-4 p-3 bg-blue-50 rounded-lg text-left space-y-2">
+                        <p class="text-sm font-medium text-gray-700"><i class="fas fa-map-marker-alt w-4 text-center mr-2 text-blue-500"></i><span id="profile-address"></span></p>
+                        <p class="text-sm font-medium text-gray-700"><i class="fas fa-ruler-horizontal w-4 text-center mr-2 text-blue-500"></i>Jarak Langsung: <span id="profile-distance" class="font-bold"></span></p>
+                        <p class="text-sm font-medium text-gray-700"><i class="fas fa-route w-4 text-center mr-2 text-blue-500"></i>Jarak Rute: <span id="profile-route-distance" class="font-bold">Menghitung...</span></p>
+                        <p class="text-sm font-medium text-gray-700"><i class="fas fa-clock w-4 text-center mr-2 text-blue-500"></i>Estimasi Waktu: <span id="profile-route-time" class="font-bold">Menghitung...</span></p>
+                    </div>
+                </div>
+                
+                <!-- Placeholder for when no employee is selected -->
+                <div id="profile-placeholder" class="p-5 text-center text-gray-500 flex-grow flex items-center justify-center">
+                    <p>Klik penanda di peta atau pilih nama dari daftar untuk melihat profil.</p>
+                </div>
+
+                <!-- Employee List -->
+                <div class="flex-grow overflow-y-auto sidebar-scroll">
+                     <div class="flex justify-between items-center p-4 text-md font-semibold text-gray-700 bg-gray-50 border-b border-t sticky top-0 z-10">
+                        <h3>Daftar Pegawai</h3>
+                         <div class="flex items-center space-x-2">
+                            <button id="import-data-btn" class="text-blue-600 hover:text-blue-800 w-8 h-8 rounded-full transition duration-300 flex items-center justify-center" title="Impor Data dari Excel">
+                                <i class="fas fa-file-upload"></i>
+                            </button>
+                            <input type="file" id="import-file-input" class="hidden" accept=".xlsx, .xls">
+                            <button id="export-data-btn" class="text-green-600 hover:text-green-800 w-8 h-8 rounded-full transition duration-300 flex items-center justify-center" title="Ekspor Data ke Excel">
+                                <i class="fas fa-file-download"></i>
+                            </button>
+                            <button id="add-employee-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold w-8 h-8 rounded-full transition duration-300 flex items-center justify-center" title="Tambah Pegawai Baru">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Filter Section -->
+                    <div class="p-4 bg-white border-b sticky top-12 z-10 shadow-sm">
+                        <div class="flex flex-col space-y-2">
+                            <label class="text-sm font-medium text-gray-700">Urutkan Berdasarkan:</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button id="sort-name-btn" class="sort-btn px-3 py-1 text-sm font-medium rounded-full border border-gray-300 bg-gray-50 hover:bg-gray-100 transition">
+                                    Nama <i class="fas fa-sort-alpha-down ml-1"></i>
+                                </button>
+                                <button id="sort-age-btn" class="sort-btn px-3 py-1 text-sm font-medium rounded-full border border-gray-300 bg-gray-50 hover:bg-gray-100 transition">
+                                    Umur <i class="fas fa-sort-numeric-down ml-1"></i>
+                                </button>
+                                <button id="sort-distance-btn" class="sort-btn px-3 py-1 text-sm font-medium rounded-full border border-gray-300 bg-gray-50 hover:bg-gray-100 transition">
+                                    Jarak <i class="fas fa-sort-amount-down ml-1"></i>
+                                </button>
+                            </div>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="text" id="filter-birthplace" placeholder="Filter Tempat Lahir" class="flex-1 px-3 py-1 text-sm rounded-md border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="text" id="filter-hobby" placeholder="Filter Hobi" class="flex-1 px-3 py-1 text-sm rounded-md border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <button id="clear-filter-btn" class="mt-2 px-3 py-1 text-sm font-medium rounded-full border border-gray-300 bg-white hover:bg-gray-100 transition text-gray-700">
+                                Hapus Filter
+                            </button>
+                        </div>
+                    </div>
+
+                    <ul id="employee-list" class="divide-y divide-gray-200">
+                        <!-- Employee items will be injected here by JavaScript -->
+                    </ul>
+                </div>
+                <div class="p-4 border-t text-center text-xs text-gray-500">
+                    <p>&copy; 2025 060105584</p>
+                </div>
+            </aside>
+
+            <!-- Main content area for Map or Graph -->
+            <main class="flex-grow flex flex-col bg-gray-50">
+                <!-- View Toggler -->
+                <div class="p-2 bg-white border-b text-center shadow-sm z-10">
+                    <div class="inline-flex rounded-md shadow-sm" role="group">
+                        <button type="button" id="show-map-view" class="view-toggle-btn active-view-btn px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-l-lg hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-blue-700">
+                            <i class="fas fa-map-marked-alt mr-2"></i>Peta
+                        </button>
+                        <button type="button" id="show-graph-view" class="view-toggle-btn px-4 py-2 text-sm font-medium text-gray-900 bg-white border-t border-b border-r border-gray-200 rounded-r-lg hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-blue-700">
+                            <i class="fas fa-chart-bar mr-2"></i>Grafik
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Map View -->
+                <div id="map-view" class="flex-grow">
+                    <div id="map"></div>
+                </div>
+
+                <!-- Graph View -->
+                <div id="graph-view" class="hidden flex-grow p-6 overflow-y-auto space-y-8">
+                    <!-- Chart 1: Marital Status -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Statistik Status Pernikahan</h3>
+                        <div class="bg-white p-4 rounded-lg shadow h-64 md:h-80">
+                            <canvas id="marital-status-chart"></canvas>
+                        </div>
+                    </div>
+                    <!-- Chart 2: Religion -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Statistik Agama</h3>
+                        <div class="bg-white p-4 rounded-lg shadow h-64 md:h-80">
+                            <canvas id="religion-chart"></canvas>
+                        </div>
+                    </div>
+                    <!-- Chart 3: Age Distribution -->
+                     <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Statistik Distribusi Umur</h3>
+                        <div class="bg-white p-4 rounded-lg shadow h-64 md:h-80">
+                            <canvas id="age-distribution-chart"></canvas>
+                        </div>
+                    </div>
+                    <!-- Chart 4: Pangkat/Golongan -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Statistik Pangkat/Golongan</h3>
+                        <div class="bg-white p-4 rounded-lg shadow h-64 md:h-80">
+                            <canvas id="pangkat-chart"></canvas>
+                        </div>
+                    </div>
+                    <!-- Chart 5: Pendidikan Terakhir -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Statistik Pendidikan Terakhir</h3>
+                        <div class="bg-white p-4 rounded-lg shadow h-64 md:h-80">
+                            <canvas id="education-chart"></canvas>
+                        </div>
+                    </div>
+                    <!-- Chart 6: Lama Bekerja -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Statistik Lama Bekerja</h3>
+                        <div class="bg-white p-4 rounded-lg shadow h-64 md:h-80">
+                            <canvas id="los-chart"></canvas>
+                        </div>
+                    </div>
+                    <!-- Chart 7: Ukuran Kaos -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Statistik Ukuran Kaos</h3>
+                        <div class="bg-white p-4 rounded-lg shadow h-64 md:h-80">
+                            <canvas id="tshirt-size-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Message Modal -->
+    <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm m-4">
+            <div class="p-4 border-b">
+                <h3 class="text-lg font-bold text-gray-800" id="message-title"></h3>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700" id="message-content"></p>
+            </div>
+            <div class="px-4 py-3 bg-gray-50 text-right sm:px-6 rounded-b-lg">
+                <button id="close-message-btn" type="button" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md m-4">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="text-lg font-bold">Pengaturan Kantor</h3>
+                <button id="close-modal-btn" class="text-gray-400 hover:text-gray-800 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                <form id="settings-form">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="office-name" class="block text-sm font-medium text-gray-700">Nama Kantor</label>
+                            <input type="text" id="office-name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="office-address" class="block text-sm font-medium text-gray-700">Alamat</label>
+                            <input type="text" id="office-address" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="office-phone" class="block text-sm font-medium text-gray-700">No. Telepon</label>
+                            <input type="text" id="office-phone" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                         <div>
+                            <label for="office-photo" class="block text-sm font-medium text-gray-700">URL Foto Kantor</label>
+                            <input type="url" id="office-photo" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="https://example.com/photo.jpg">
+                        </div>
+                        <div>
+                            <label for="office-radius" class="block text-sm font-medium text-gray-700">Jarak Radius (meter)</label>
+                            <input type="number" id="office-radius" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="office-lat" class="block text-sm font-medium text-gray-700">Latitude</label>
+                                <input type="number" step="any" id="office-lat" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="office-lng" class="block text-sm font-medium text-gray-700">Longitude</label>
+                                <input type="number" step="any" id="office-lng" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="px-4 py-3 bg-gray-50 text-right sm:px-6 rounded-b-lg">
+                <button id="cancel-settings-btn" type="button" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Batal
+                </button>
+                <button id="save-settings-btn" type="submit" form="settings-form" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Simpan Perubahan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Employee Modal -->
+    <div id="edit-employee-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md m-4">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="text-lg font-bold">Edit Data Pegawai</h3>
+                <button id="close-edit-modal-btn" class="text-gray-400 hover:text-gray-800 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-6 max-h-[80vh] overflow-y-auto">
+                <form id="edit-employee-form">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="employee-name" class="block text-sm font-medium text-gray-700">Nama Lengkap</label>
+                            <input type="text" id="employee-name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="employee-position" class="block text-sm font-medium text-gray-700">Jabatan</label>
+                            <input type="text" id="employee-position" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="employee-nickname" class="block text-sm font-medium text-gray-700">Nama Panggilan</label>
+                            <input type="text" id="employee-nickname" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                         <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="employee-birthplace" class="block text-sm font-medium text-gray-700">Tempat Lahir</label>
+                                <input type="text" id="employee-birthplace" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="employee-dob" class="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
+                                <input type="date" id="employee-dob" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="employee-phone" class="block text-sm font-medium text-gray-700">No. HP</label>
+                            <input type="tel" id="employee-phone" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="employee-blood-type" class="block text-sm font-medium text-gray-700">Gol. Darah</label>
+                                <input type="text" id="employee-blood-type" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="employee-marital-status" class="block text-sm font-medium text-gray-700">Status</label>
+                                <input type="text" id="employee-marital-status" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="employee-religion" class="block text-sm font-medium text-gray-700">Agama</label>
+                            <input type="text" id="employee-religion" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="employee-social-media" class="block text-sm font-medium text-gray-700">Link Medsos</label>
+                            <input type="url" id="employee-social-media" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="https://linkedin.com/in/user">
+                        </div>
+                        <div>
+                            <label for="employee-hobby" class="block text-sm font-medium text-gray-700">Hobi</label>
+                            <input type="text" id="employee-hobby" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="employee-favorite" class="block text-sm font-medium text-gray-700">Favorit</label>
+                            <input type="text" id="employee-favorite" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="employee-last-education" class="block text-sm font-medium text-gray-700">Pendidikan Terakhir</label>
+                            <input type="text" id="employee-last-education" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="employee-medical-history" class="block text-sm font-medium text-gray-700">Riwayat Sakit</label>
+                            <textarea id="employee-medical-history" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                        </div>
+                        <div>
+                            <label for="employee-pangkat-gol" class="block text-sm font-medium text-gray-700">Pangkat/Gol.</label>
+                            <input type="text" id="employee-pangkat-gol" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="employee-tanggal-mutasi" class="block text-sm font-medium text-gray-700">Tanggal Mutasi</label>
+                            <input type="date" id="employee-tanggal-mutasi" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="employee-ukuran-kaos" class="block text-sm font-medium text-gray-700">Ukuran Kaos</label>
+                            <input type="text" id="employee-ukuran-kaos" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="employee-address" class="block text-sm font-medium text-gray-700">Alamat</label>
+                            <input type="text" id="employee-address" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                         <div>
+                            <label class="block text-sm font-medium text-gray-700">Foto Pegawai</label>
+                            <div class="mt-1 flex items-center space-x-4">
+                                <img id="employee-photo-preview" src="https://placehold.co/100x100/EBF4FF/3B82F6?text=Foto" alt="Preview Foto" class="w-16 h-16 rounded-full object-cover bg-gray-100">
+                                <div class="flex-grow">
+                                    <label for="employee-photo-upload" class="cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        <span>Ubah Foto</span>
+                                        <input id="employee-photo-upload" name="employee-photo-upload" type="file" class="sr-only" accept="image/*">
+                                    </label>
+                                    <p class="text-xs text-gray-500 mt-1">Gunakan file gambar (PNG, JPG).</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="employee-lat" class="block text-sm font-medium text-gray-700">Latitude</label>
+                                <input type="number" step="any" id="employee-lat" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="employee-lng" class="block text-sm font-medium text-gray-700">Longitude</label>
+                                <input type="number" step="any" id="employee-lng" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="px-4 py-3 bg-gray-50 flex justify-between items-center rounded-b-lg">
+                <button id="delete-employee-btn" type="button" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                    Hapus Pegawai
+                </button>
+                <div>
+                    <button id="cancel-edit-btn" type="button" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Batal
+                    </button>
+                    <button id="save-edit-btn" type="submit" form="edit-employee-form" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Simpan Perubahan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Employee Modal -->
+    <div id="add-employee-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md m-4">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="text-lg font-bold">Tambah Data Pegawai Baru</h3>
+                <button id="close-add-modal-btn" class="text-gray-400 hover:text-gray-800 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-6 max-h-[80vh] overflow-y-auto">
+                <form id="add-employee-form">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="add-employee-name" class="block text-sm font-medium text-gray-700">Nama Lengkap</label>
+                            <input type="text" id="add-employee-name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required>
+                        </div>
+                        <div>
+                            <label for="add-employee-position" class="block text-sm font-medium text-gray-700">Jabatan</label>
+                            <input type="text" id="add-employee-position" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        </div>
+                        <div>
+                            <label for="add-employee-nickname" class="block text-sm font-medium text-gray-700">Nama Panggilan</label>
+                            <input type="text" id="add-employee-nickname" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        </div>
+                         <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="add-employee-birthplace" class="block text-sm font-medium text-gray-700">Tempat Lahir</label>
+                                <input type="text" id="add-employee-birthplace" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            </div>
+                            <div>
+                                <label for="add-employee-dob" class="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
+                                <input type="date" id="add-employee-dob" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="add-employee-phone" class="block text-sm font-medium text-gray-700">No. HP</label>
+                            <input type="tel" id="add-employee-phone" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="add-employee-blood-type" class="block text-sm font-medium text-gray-700">Gol. Darah</label>
+                                <input type="text" id="add-employee-blood-type" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            </div>
+                            <div>
+                                <label for="add-employee-marital-status" class="block text-sm font-medium text-gray-700">Status</label>
+                                <input type="text" id="add-employee-marital-status" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="add-employee-religion" class="block text-sm font-medium text-gray-700">Agama</label>
+                            <input type="text" id="add-employee-religion" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        </div>
+                        <div>
+                            <label for="add-employee-social-media" class="block text-sm font-medium text-gray-700">Link Medsos</label>
+                            <input type="url" id="add-employee-social-media" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder="https://linkedin.com/in/user">
+                        </div>
+                        <div>
+                            <label for="add-employee-hobby" class="block text-sm font-medium text-gray-700">Hobi</label>
+                            <input type="text" id="add-employee-hobby" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        </div>
+                        <div>
+                            <label for="add-employee-favorite" class="block text-sm font-medium text-gray-700">Favorit</label>
+                            <input type="text" id="add-employee-favorite" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        </div>
+                        <div>
+                            <label for="add-employee-last-education" class="block text-sm font-medium text-gray-700">Pendidikan Terakhir</label>
+                            <input type="text" id="add-employee-last-education" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        </div>
+                        <div>
+                            <label for="add-employee-medical-history" class="block text-sm font-medium text-gray-700">Riwayat Sakit</label>
+                            <textarea id="add-employee-medical-history" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"></textarea>
+                        </div>
+                        <div>
+                            <label for="add-employee-pangkat-gol" class="block text-sm font-medium text-gray-700">Pangkat/Gol.</label>
+                            <input type="text" id="add-employee-pangkat-gol" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        </div>
+                        <div>
+                            <label for="add-employee-tanggal-mutasi" class="block text-sm font-medium text-gray-700">Tanggal Mutasi</label>
+                            <input type="date" id="add-employee-tanggal-mutasi" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        </div>
+                        <div>
+                            <label for="add-employee-ukuran-kaos" class="block text-sm font-medium text-gray-700">Ukuran Kaos</label>
+                            <input type="text" id="add-employee-ukuran-kaos" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        </div>
+                        <div>
+                            <label for="add-employee-address" class="block text-sm font-medium text-gray-700">Alamat</label>
+                            <input type="text" id="add-employee-address" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required>
+                        </div>
+                         <div>
+                            <label class="block text-sm font-medium text-gray-700">Foto Pegawai</label>
+                            <div class="mt-1 flex items-center space-x-4">
+                                <img id="add-employee-photo-preview" src="https://placehold.co/100x100/EBF4FF/3B82F6?text=Foto" alt="Preview Foto" class="w-16 h-16 rounded-full object-cover bg-gray-100">
+                                <div class="flex-grow">
+                                    <label for="add-employee-photo-upload" class="cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                        <span>Pilih Foto</span>
+                                        <input id="add-employee-photo-upload" type="file" class="sr-only" accept="image/*">
+                                    </label>
+                                    <p class="text-xs text-gray-500 mt-1">Gunakan file gambar (PNG, JPG).</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="add-employee-lat" class="block text-sm font-medium text-gray-700">Latitude</label>
+                                <input type="number" step="any" id="add-employee-lat" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required>
+                            </div>
+                            <div>
+                                <label for="add-employee-lng" class="block text-sm font-medium text-gray-700">Longitude</label>
+                                <input type="number" step="any" id="add-employee-lng" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="px-4 py-3 bg-gray-50 text-right sm:px-6 rounded-b-lg">
+                <button id="cancel-add-btn" type="button" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Batal
+                </button>
+                <button id="save-add-btn" type="submit" form="add-employee-form" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    Simpan Pegawai
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm m-4">
+            <div class="p-4 border-b">
+                <h3 class="text-lg font-bold text-gray-800" id="confirm-title">Konfirmasi Penghapusan</h3>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700" id="confirm-content">Apakah Anda yakin ingin menghapus data pegawai ini?</p>
+            </div>
+            <div class="px-4 py-3 bg-gray-50 flex justify-end space-x-3 rounded-b-lg">
+                <button id="cancel-confirm-btn" type="button" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Batal
+                </button>
+                <button id="confirm-delete-btn" type="button" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                    Ya, Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            let isAppInitialized = false;
+            let map = null;
+
+            // --- LOGIN ELEMENTS & LOGIC ---
+            const loginContainer = document.getElementById('login-container');
+            const appContainer = document.getElementById('app-container');
+            const loginForm = document.getElementById('login-form');
+            const loginError = document.getElementById('login-error');
+            const logoutBtn = document.getElementById('logout-btn');
+
+            loginForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const username = loginForm.username.value;
+                const password = loginForm.password.value;
+
+                if (username === 'admin' && password === 'Kpp501') {
+                    loginContainer.classList.add('hidden');
+                    appContainer.classList.remove('hidden');
+                    
+                    if (!isAppInitialized) {
+                        initializeApp();
+                        isAppInitialized = true;
+                    } else {
+                         // If already initialized, just ensure map renders correctly after being un-hidden
+                        setTimeout(() => {
+                            if (map) map.invalidateSize();
+                        }, 100);
+                    }
+                } else {
+                    loginError.classList.remove('hidden');
+                }
+            });
+
+            logoutBtn.addEventListener('click', function() {
+                appContainer.classList.add('hidden');
+                loginContainer.classList.remove('hidden');
+                loginForm.password.value = '';
+                loginError.classList.add('hidden');
+            });
+
+
+            // --- MAIN APP INITIALIZATION (wrapped in a function) ---
+            function initializeApp() {
+                const DB_KEY = 'employee_db_storage';
+                
+                // --- DATA KONFIGURASI ---
+                const office = {
+                    name: 'KPP Pratama Tegal',
+                    address: 'Jl. Kolonel Sugiono No.5, Pekauman, Kec. Tegal Bar., Kota Tegal, Jawa Tengah 52113',
+                    coords: [-6.86952, 109.12767],
+                    phone: '0283-351562',
+                    photo: 'https://placehold.co/150x100/EBF4FF/3B82F6?text=KPP+Tegal'
+                };
+                let radiusInMeters = 5000;
+                
+                const initialEmployees = [
+                    {
+                        id: 1, name: 'Budi Santoso', nickname: 'Budi', position: 'Account Representative', address: 'Jl. Gajah Mada No. 10, Tegal', birthplace: 'Tegal', dob: '1995-05-15', phone: '0812-3456-7890', bloodType: 'O', maritalStatus: 'Belum Menikah', religion: 'Islam', socialMedia: 'https://www.linkedin.com/in/budisantoso', hobby: 'Bermain futsal, membaca buku', favorite: 'Kopi', lastEducation: 'S1 Akuntansi', medicalHistory: 'Alergi debu', pangkatGol: 'III/b', tanggalMutasi: '2022-08-01', ukuranKaos: 'L', photo: 'https://placehold.co/100x100/EBF4FF/3B82F6?text=BS', coords: [-6.8688, 109.1402]
+                    },
+                    {
+                        id: 2, name: 'Citra Lestari', nickname: 'Citra', position: 'Fungsional Pemeriksa Pajak', address: 'Perumahan Graha Mutiara, Tegal', birthplace: 'Slawi', dob: '1998-08-20', phone: '0857-1122-3344', bloodType: 'A', maritalStatus: 'Belum Menikah', religion: 'Islam', socialMedia: 'https://www.instagram.com/citralestari', hobby: 'Memasak, fotografi', favorite: 'Soto Tegal', lastEducation: 'D3 Pajak', medicalHistory: 'Maag', pangkatGol: 'III/a', tanggalMutasi: '2023-02-15', ukuranKaos: 'M', photo: 'https://placehold.co/100x100/FEF2F2/EF4444?text=CL', coords: [-6.8910, 109.1255]
+                    },
+                    {
+                        id: 3, name: 'Andi Wijaya', nickname: 'Andi', position: 'Pelaksana', address: 'Jl. Veteran No. 9, Tegal', birthplace: 'Brebes', dob: '1993-11-25', phone: '0878-5566-7788', bloodType: 'B', maritalStatus: 'Menikah', religion: 'Islam', socialMedia: 'https://github.com/andiwijaya', hobby: 'Coding, bersepeda', favorite: 'Sate kambing', lastEducation: 'S1 Manajemen', medicalHistory: 'Tidak ada riwayat sakit serius.', pangkatGol: 'III/c', tanggalMutasi: '2021-05-20', ukuranKaos: 'XL', photo: 'https://placehold.co/100x100/ECFDF5/10B981?text=AW', coords: [-6.8655, 109.1311]
+                    }
+                ];
+
+                let employees = []; 
+
+                // --- FUNGSI DATABASE (localStorage) ---
+                function loadEmployeesFromDB() {
+                    const data = localStorage.getItem(DB_KEY);
+                    if (data) {
+                        employees = JSON.parse(data);
+                    } else {
+                        employees = initialEmployees; 
+                        saveEmployeesToDB();
+                    }
+                }
+                function saveEmployeesToDB() {
+                    localStorage.setItem(DB_KEY, JSON.stringify(employees));
+                }
+                
+                // --- INISIALISASI PETA ---
+                map = L.map('map').setView(office.coords, 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+
+                // --- PENANDA & ELEMEN PETA ---
+                let officeMarker, radiusCircle, routingControl = null;
+                const officeIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] });
+                
+                function createOfficePopupContent() { return `<div class="text-center"><img src="${office.photo}" alt="Foto Kantor" class="w-full h-20 object-cover rounded-t-md mb-2" onerror="this.style.display='none'"><div class="p-1"><b class="text-base">${office.name}</b><br><span class="text-xs">${office.address}</span><br><span class="text-xs text-gray-600"><i class="fas fa-phone-alt mr-1"></i>${office.phone}</span></div></div>`; }
+                
+                officeMarker = L.marker(office.coords, { icon: officeIcon }).addTo(map).bindPopup(createOfficePopupContent());
+                radiusCircle = L.circle(office.coords, { radius: radiusInMeters, color: 'blue', fillColor: '#3B82F6', fillOpacity: 0.1, weight: 2 }).addTo(map).bindPopup(`Radius ${radiusInMeters / 1000} km dari kantor`);
+
+                // --- LOGIKA APLIKASI ---
+                const employeeList = document.getElementById('employee-list');
+                let officeLatLng = L.latLng(office.coords);
+                const employeeMarkers = new Map();
+                let activeEmployeeId = null;
+                let maritalStatusChart, religionChart, ageDistributionChart, pangkatChart, educationChart, losChart, tShirtSizeChart = null;
+                let currentSort = 'name', currentSortOrder = 'asc', filterBirthplace = '', filterHobby = '';
+
+                function applyFiltersAndSort() {
+                    let filteredEmployees = employees.filter(emp => {
+                        const matchesBirthplace = filterBirthplace === '' || (emp.birthplace && emp.birthplace.toLowerCase().includes(filterBirthplace.toLowerCase()));
+                        const matchesHobby = filterHobby === '' || (emp.hobby && emp.hobby.toLowerCase().includes(filterHobby.toLowerCase()));
+                        return matchesBirthplace && matchesHobby;
+                    });
+                    
+                    filteredEmployees.sort((a, b) => {
+                        let comparison = 0;
+                        if (currentSort === 'name') comparison = a.name.localeCompare(b.name);
+                        else if (currentSort === 'age') comparison = (new Date().getFullYear() - new Date(a.dob).getFullYear()) - (new Date().getFullYear() - new Date(b.dob).getFullYear());
+                        else if (currentSort === 'distance') comparison = a.distance - b.distance;
+                        return currentSortOrder === 'asc' ? comparison : -comparison;
+                    });
+
+                    renderEmployeeList(filteredEmployees);
+                    renderCharts(filteredEmployees);
+                }
+                
+                function renderOfficeHeader() {
+                    document.getElementById('office-header-photo').src = office.photo;
+                    document.getElementById('office-header-name').textContent = office.name;
+                    document.getElementById('office-header-address').textContent = office.address;
+                }
+
+                function renderEmployeeList(data) {
+                    employeeMarkers.forEach(marker => map.removeLayer(marker));
+                    employeeMarkers.clear();
+                    employeeList.innerHTML = '';
+
+                    data.forEach(employee => {
+                        employee.distance = L.latLng(employee.coords).distanceTo(officeLatLng);
+                        let marker = L.marker(employee.coords).addTo(map).bindPopup(`<b>${employee.name}</b><br>${employee.position}`);
+                        marker.on('click', () => showProfile(employee.id));
+                        employeeMarkers.set(employee.id, marker);
+
+                        const listItem = document.createElement('li');
+                        listItem.className = 'p-4 border-l-4 border-transparent hover:bg-gray-50 cursor-pointer employee-item flex justify-between items-center';
+                        listItem.dataset.id = employee.id;
+                        listItem.innerHTML = `<div class="flex items-center space-x-4 flex-grow"><img src="${employee.photo}" alt="${employee.name}" class="w-10 h-10 rounded-full object-cover"><div class="flex-1"><p class="font-semibold text-gray-800">${employee.name}</p><p class="text-sm text-gray-500">${employee.position}</p></div></div><button class="edit-employee-btn text-gray-400 hover:text-blue-500 p-2" data-id="${employee.id}" title="Edit Pegawai"><i class="fas fa-pencil-alt fa-sm"></i></button>`;
+                        listItem.querySelector('.flex-grow').addEventListener('click', () => { showProfile(employee.id); map.setView(employee.coords, 15); });
+                        listItem.querySelector('.edit-employee-btn').addEventListener('click', (e) => { e.stopPropagation(); openEditEmployeeModal(employee.id); });
+                        employeeList.appendChild(listItem);
+                    });
+
+                    document.querySelectorAll('.sort-btn').forEach(btn => {
+                        const sortType = btn.id.split('-')[1];
+                        btn.classList.remove('bg-yellow-400', 'text-yellow-900', 'border-yellow-500');
+                        if (currentSort === sortType) btn.classList.add('bg-yellow-400', 'text-yellow-900', 'border-yellow-500');
+                    });
+                }
+                
+                function renderCharts(data) {
+                    renderMaritalStatusChart(data);
+                    renderReligionChart(data);
+                    renderAgeDistributionChart(data);
+                    renderPangkatChart(data);
+                    renderEducationChart(data);
+                    renderLosChart(data);
+                    renderTShirtSizeChart(data);
+                }
+
+                const chartColors = ['rgba(59, 130, 246, 0.7)', 'rgba(239, 68, 68, 0.7)', 'rgba(16, 185, 129, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(139, 92, 246, 0.7)', 'rgba(236, 72, 153, 0.7)'];
+                function renderMaritalStatusChart(data) { const ctx = document.getElementById('marital-status-chart').getContext('2d'); if (maritalStatusChart) maritalStatusChart.destroy(); const counts = data.reduce((acc, emp) => { const status = emp.maritalStatus || 'Tidak Diketahui'; acc[status] = (acc[status] || 0) + 1; return acc; }, {}); maritalStatusChart = new Chart(ctx, { type: 'pie', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: chartColors }] }, options: { responsive: true, maintainAspectRatio: false } }); }
+                function renderReligionChart(data) { const ctx = document.getElementById('religion-chart').getContext('2d'); if (religionChart) religionChart.destroy(); const counts = data.reduce((acc, emp) => { const religion = emp.religion || 'Tidak Diketahui'; acc[religion] = (acc[religion] || 0) + 1; return acc; }, {}); religionChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: chartColors }] }, options: { responsive: true, maintainAspectRatio: false } }); }
+                function renderAgeDistributionChart(data) { const ctx = document.getElementById('age-distribution-chart').getContext('2d'); if (ageDistributionChart) ageDistributionChart.destroy(); const ageGroups = { 'Di Bawah 25': 0, '25-30': 0, '31-35': 0, '36-40': 0, 'Diatas 40': 0 }; data.forEach(emp => { const age = new Date().getFullYear() - new Date(emp.dob).getFullYear(); if (age < 25) ageGroups['Di Bawah 25']++; else if (age <= 30) ageGroups['25-30']++; else if (age <= 35) ageGroups['31-35']++; else if (age <= 40) ageGroups['36-40']++; else ageGroups['Diatas 40']++; }); ageDistributionChart = new Chart(ctx, { type: 'bar', data: { labels: Object.keys(ageGroups), datasets: [{ label: 'Jumlah Karyawan', data: Object.values(ageGroups), backgroundColor: chartColors[0] }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } } } } }); }
+                function renderPangkatChart(data) { const ctx = document.getElementById('pangkat-chart').getContext('2d'); if (pangkatChart) pangkatChart.destroy(); const counts = data.reduce((acc, emp) => { const pangkat = emp.pangkatGol || 'Tidak Diketahui'; acc[pangkat] = (acc[pangkat] || 0) + 1; return acc; }, {}); pangkatChart = new Chart(ctx, { type: 'bar', data: { labels: Object.keys(counts), datasets: [{ label: 'Jumlah Karyawan', data: Object.values(counts), backgroundColor: chartColors[2] }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } } } } }); }
+                function renderEducationChart(data) { const ctx = document.getElementById('education-chart').getContext('2d'); if (educationChart) educationChart.destroy(); const counts = data.reduce((acc, emp) => { const education = emp.lastEducation || 'Tidak Diketahui'; let level = 'Lainnya'; if (education.toUpperCase().includes('S3')) level = 'S3'; else if (education.toUpperCase().includes('S2')) level = 'S2'; else if (education.toUpperCase().includes('S1')) level = 'S1'; else if (education.toUpperCase().includes('D4')) level = 'D4'; else if (education.toUpperCase().includes('D3')) level = 'D3'; else if (education.toUpperCase().includes('D1')) level = 'D1'; else if (education === 'Tidak Diketahui') level = 'Tidak Diketahui'; acc[level] = (acc[level] || 0) + 1; return acc; }, {}); educationChart = new Chart(ctx, { type: 'pie', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: chartColors }] }, options: { responsive: true, maintainAspectRatio: false } }); }
+                function renderLosChart(data) { const ctx = document.getElementById('los-chart').getContext('2d'); if (losChart) losChart.destroy(); const losGroups = { '< 1 Tahun': 0, '1-2 Tahun': 0, '2-3 Tahun': 0, '3-4 Tahun': 0, '> 4 Tahun': 0 }; const now = new Date(); data.forEach(emp => { if (emp.tanggalMutasi) { const startDate = new Date(emp.tanggalMutasi); const yearsOfService = (now - startDate) / (1000 * 60 * 60 * 24 * 365.25); if (yearsOfService < 1) losGroups['< 1 Tahun']++; else if (yearsOfService < 2) losGroups['1-2 Tahun']++; else if (yearsOfService < 3) losGroups['2-3 Tahun']++; else if (yearsOfService < 4) losGroups['3-4 Tahun']++; else losGroups['> 4 Tahun']++; } }); losChart = new Chart(ctx, { type: 'bar', data: { labels: Object.keys(losGroups), datasets: [{ label: 'Jumlah Karyawan', data: Object.values(losGroups), backgroundColor: chartColors[3] }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } } } } }); }
+                function renderTShirtSizeChart(data) { const ctx = document.getElementById('tshirt-size-chart').getContext('2d'); if (tShirtSizeChart) tShirtSizeChart.destroy(); const counts = data.reduce((acc, emp) => { const size = emp.ukuranKaos ? emp.ukuranKaos.toUpperCase() : 'Tidak Diketahui'; acc[size] = (acc[size] || 0) + 1; return acc; }, {}); tShirtSizeChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ label: 'Jumlah Karyawan', data: Object.values(counts), backgroundColor: chartColors }] }, options: { responsive: true, maintainAspectRatio: false } }); }
+
+                function hideProfile() {
+                    document.getElementById('profile-card').classList.add('hidden');
+                    document.getElementById('profile-placeholder').classList.remove('hidden');
+                    if (activeEmployeeId) {
+                        const oldActiveItem = document.querySelector(`.employee-item[data-id='${activeEmployeeId}']`);
+                        if (oldActiveItem) oldActiveItem.classList.remove('active');
+                    }
+                    activeEmployeeId = null;
+                    if (routingControl) {
+                        map.removeControl(routingControl);
+                        routingControl = null;
+                    }
+                    map.closePopup();
+                }
+
+                function formatDateToDDMMYYYY(dateString) {
+                    if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+                        return '-';
+                    }
+                    const [year, month, day] = dateString.split('-');
+                    return `${day}/${month}/${year}`;
+                }
+
+                function showProfile(employeeId) {
+                    const employee = employees.find(e => e.id === employeeId);
+                    if (!employee) return;
+                    
+                    activeEmployeeId = employeeId;
+
+                    document.getElementById('profile-placeholder').classList.add('hidden');
+                    document.getElementById('profile-card').classList.remove('hidden');
+
+                    document.getElementById('profile-photo').src = employee.photo;
+                    document.getElementById('profile-name').textContent = employee.name;
+                    document.getElementById('profile-position').textContent = employee.position;
+                    document.getElementById('profile-nickname').textContent = employee.nickname;
+                    document.getElementById('profile-dob').textContent = `${employee.birthplace}, ${formatDateToDDMMYYYY(employee.dob)}`;
+                    document.getElementById('profile-phone').textContent = employee.phone;
+                    document.getElementById('profile-blood-type').textContent = employee.bloodType || '-';
+                    document.getElementById('profile-marital-status').textContent = employee.maritalStatus || '-';
+                    document.getElementById('profile-religion').textContent = employee.religion || '-';
+                    document.getElementById('profile-last-education').textContent = employee.lastEducation || '-';
+                    document.getElementById('profile-medical-history').textContent = employee.medicalHistory || '-';
+                    document.getElementById('profile-pangkat-gol').textContent = employee.pangkatGol || '-';
+                    document.getElementById('profile-tanggal-mutasi').textContent = formatDateToDDMMYYYY(employee.tanggalMutasi);
+                    document.getElementById('profile-ukuran-kaos').textContent = employee.ukuranKaos || '-';
+
+                    const socialMediaLink = document.getElementById('profile-social-media');
+                    if (employee.socialMedia) {
+                        socialMediaLink.href = employee.socialMedia;
+                        try {
+                            socialMediaLink.textContent = new URL(employee.socialMedia).hostname;
+                        } catch (e) {
+                             socialMediaLink.textContent = "Link";
+                        }
+                        socialMediaLink.parentElement.style.display = 'block';
+                    } else {
+                        socialMediaLink.parentElement.style.display = 'none';
+                    }
+
+                    document.getElementById('profile-hobby').textContent = employee.hobby;
+                    document.getElementById('profile-favorite').textContent = employee.favorite;
+                    document.getElementById('profile-address').textContent = employee.address;
+                    document.getElementById('profile-distance').textContent = formatDistance(employee.distance);
+
+                    document.querySelectorAll('.employee-item').forEach(item => {
+                        item.classList.remove('active');
+                        if (parseInt(item.dataset.id) === employeeId) {
+                            item.classList.add('active');
+                        }
+                    });
+
+                     const marker = employeeMarkers.get(employeeId);
+                     if (marker) marker.openPopup();
+
+                    calculateRoute(employee);
+                }
+
+                function calculateRoute(employee) {
+                    const routeDistEl = document.getElementById('profile-route-distance');
+                    const routeTimeEl = document.getElementById('profile-route-time');
+                    routeDistEl.textContent = 'Menghitung...';
+                    routeTimeEl.textContent = 'Menghitung...';
+
+                    if (routingControl) map.removeControl(routingControl);
+
+                    routingControl = L.Routing.control({
+                        waypoints: [L.latLng(office.coords), L.latLng(employee.coords)],
+                        routeWhileDragging: false, addWaypoints: false, draggableWaypoints: false,
+                        fitSelectedRoutes: false, show: false,
+                        lineOptions: { styles: [{color: '#3B82F6', opacity: 0.8, weight: 6}] },
+                        createMarker: () => null
+                    }).on('routesfound', (e) => {
+                        const summary = e.routes[0].summary;
+                        routeDistEl.textContent = formatDistance(summary.totalDistance);
+                        routeTimeEl.textContent = formatTime(summary.totalTime);
+                    }).on('routingerror', () => {
+                        routeDistEl.textContent = 'Tidak tersedia';
+                        routeTimeEl.textContent = 'Tidak tersedia';
+                    }).addTo(map);
+                }
+                
+                function formatDistance(meters) { return meters > 1000 ? (meters / 1000).toFixed(2) + ' km' : Math.round(meters) + ' m'; }
+                function formatTime(s) { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return (h > 0 ? `${h} jam ` : '') + (m > 0 ? `${m} menit` : '').trim() || '1 menit'; }
+                function showMessage(title, content) {
+                    document.getElementById('message-title').textContent = title;
+                    document.getElementById('message-content').textContent = content;
+                    document.getElementById('message-modal').classList.remove('hidden');
+                }
+
+                const settingsModal = document.getElementById('settings-modal');
+                const settingsBtn = document.getElementById('settings-btn');
+                const closeModalBtn = document.getElementById('close-modal-btn');
+                const cancelSettingsBtn = document.getElementById('cancel-settings-btn');
+                const settingsForm = document.getElementById('settings-form');
+                const messageModal = document.getElementById('message-modal');
+                document.getElementById('close-message-btn').addEventListener('click', () => messageModal.classList.add('hidden'));
+
+                function openSettingsModal() {
+                    document.getElementById('office-name').value = office.name;
+                    document.getElementById('office-address').value = office.address;
+                    document.getElementById('office-phone').value = office.phone;
+                    document.getElementById('office-photo').value = office.photo;
+                    document.getElementById('office-lat').value = office.coords[0];
+                    document.getElementById('office-lng').value = office.coords[1];
+                    document.getElementById('office-radius').value = radiusInMeters;
+                    settingsModal.classList.remove('hidden');
+                }
+                function closeSettingsModal() { settingsModal.classList.add('hidden'); }
+                settingsBtn.addEventListener('click', openSettingsModal);
+                closeModalBtn.addEventListener('click', closeSettingsModal);
+                cancelSettingsBtn.addEventListener('click', closeSettingsModal);
+                settingsForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    office.name = document.getElementById('office-name').value;
+                    office.address = document.getElementById('office-address').value;
+                    office.phone = document.getElementById('office-phone').value;
+                    office.photo = document.getElementById('office-photo').value;
+                    office.coords = [parseFloat(document.getElementById('office-lat').value), parseFloat(document.getElementById('office-lng').value)];
+                    radiusInMeters = parseInt(document.getElementById('office-radius').value, 10);
+                    
+                    renderOfficeHeader();
+                    
+                    officeLatLng = L.latLng(office.coords);
+                    map.setView(office.coords, 13);
+                    officeMarker.setLatLng(office.coords).bindPopup(createOfficePopupContent());
+                    radiusCircle.setLatLng(office.coords).setRadius(radiusInMeters).bindPopup(`Radius ${radiusInMeters / 1000} km`);
+                    applyFiltersAndSort();
+                    if (activeEmployeeId) showProfile(activeEmployeeId);
+                    closeSettingsModal();
+                });
+
+                const editEmployeeModal = document.getElementById('edit-employee-modal');
+                const closeEditModalBtn = document.getElementById('close-edit-modal-btn');
+                const cancelEditBtn = document.getElementById('cancel-edit-btn');
+                const editEmployeeForm = document.getElementById('edit-employee-form');
+                const editProfileBtn = document.getElementById('edit-profile-btn');
+                const deleteEmployeeBtn = document.getElementById('delete-employee-btn');
+                let currentEditingEmployeeId = null;
+
+                function openEditEmployeeModal(employeeId) {
+                    const emp = employees.find(e => e.id === employeeId);
+                    if (!emp) return;
+                    currentEditingEmployeeId = emp.id;
+                    for (const key in emp) {
+                        const input = document.getElementById(`employee-${key.replace(/([A-Z])/g, "-$1").toLowerCase()}`);
+                        if (input) input.value = emp[key];
+                    }
+                    document.getElementById('employee-lat').value = emp.coords[0];
+                    document.getElementById('employee-lng').value = emp.coords[1];
+                    
+                    document.getElementById('employee-photo-preview').src = emp.photo || 'https://placehold.co/100x100/EBF4FF/3B82F6?text=Foto';
+                    document.getElementById('employee-photo-upload').value = '';
+
+                    editEmployeeModal.classList.remove('hidden');
+                }
+                function closeEditEmployeeModal() { editEmployeeModal.classList.add('hidden'); }
+                closeEditModalBtn.addEventListener('click', closeEditEmployeeModal);
+                cancelEditBtn.addEventListener('click', closeEditEmployeeModal);
+                editProfileBtn.addEventListener('click', () => { if(activeEmployeeId) openEditEmployeeModal(activeEmployeeId); });
+                
+                editEmployeeForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const emp = employees.find(e => e.id === currentEditingEmployeeId);
+                    if (!emp) return;
+
+                    const photoFile = document.getElementById('employee-photo-upload').files[0];
+                    if (photoFile) {
+                        try {
+                            emp.photo = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = () => resolve(reader.result);
+                                reader.onerror = error => reject(error);
+                                reader.readAsDataURL(photoFile);
+                            });
+                        } catch (error) {
+                            console.error("Error reading file:", error);
+                            showMessage('Error', 'Gagal membaca file foto.');
+                            return;
+                        }
+                    }
+
+                    for (const key in emp) {
+                        if (key === 'photo' || key === 'coords') continue;
+                        const keyId = `employee-${key.replace(/([A-Z])/g, "-$1").toLowerCase()}`;
+                        const input = document.getElementById(keyId);
+                        if (input && typeof emp[key] !== 'object') {
+                           emp[key] = input.value;
+                        }
+                    }
+                    emp.coords = [parseFloat(document.getElementById('employee-lat').value), parseFloat(document.getElementById('employee-lng').value)];
+                    
+                    saveEmployeesToDB();
+                    applyFiltersAndSort();
+                    if (activeEmployeeId === currentEditingEmployeeId) showProfile(currentEditingEmployeeId);
+                    closeEditEmployeeModal();
+                });
+                
+                const addEmployeeModal = document.getElementById('add-employee-modal');
+                const addEmployeeBtn = document.getElementById('add-employee-btn');
+                const closeAddModalBtn = document.getElementById('close-add-modal-btn');
+                const cancelAddBtn = document.getElementById('cancel-add-btn');
+                const addEmployeeForm = document.getElementById('add-employee-form');
+                
+                function openAddEmployeeModal() {
+                    addEmployeeForm.reset();
+                    document.getElementById('add-employee-photo-preview').src = 'https://placehold.co/100x100/EBF4FF/3B82F6?text=Foto';
+                    addEmployeeModal.classList.remove('hidden');
+                }
+
+                function closeAddEmployeeModal() {
+                    addEmployeeModal.classList.add('hidden');
+                }
+
+                addEmployeeBtn.addEventListener('click', openAddEmployeeModal);
+                closeAddModalBtn.addEventListener('click', closeAddEmployeeModal);
+                cancelAddBtn.addEventListener('click', closeAddEmployeeModal);
+                
+                document.getElementById('add-employee-photo-upload').addEventListener('change', function() {
+                    if (this.files && this.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            document.getElementById('add-employee-photo-preview').src = e.target.result;
+                        };
+                        reader.readAsDataURL(this.files[0]);
+                    }
+                });
+
+                addEmployeeForm.addEventListener('submit', async function(e) {
+                     e.preventDefault();
+                    
+                    const newId = employees.length > 0 ? Math.max(...employees.map(e => e.id)) + 1 : 1;
+                    let photoData = 'https://placehold.co/100x100/EBF4FF/3B82F6?text=Foto';
+                    
+                    const photoFile = document.getElementById('add-employee-photo-upload').files[0];
+                    if (photoFile) {
+                        try {
+                            photoData = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = () => resolve(reader.result);
+                                reader.onerror = error => reject(error);
+                                reader.readAsDataURL(photoFile);
+                            });
+                        } catch (error) {
+                            console.error("Error reading file:", error);
+                            showMessage('Error', 'Gagal membaca file foto.');
+                            return;
+                        }
+                    }
+
+                    const newEmployee = {
+                        id: newId,
+                        name: document.getElementById('add-employee-name').value,
+                        nickname: document.getElementById('add-employee-nickname').value,
+                        position: document.getElementById('add-employee-position').value,
+                        address: document.getElementById('add-employee-address').value,
+                        birthplace: document.getElementById('add-employee-birthplace').value,
+                        dob: document.getElementById('add-employee-dob').value,
+                        phone: document.getElementById('add-employee-phone').value,
+                        bloodType: document.getElementById('add-employee-blood-type').value,
+                        maritalStatus: document.getElementById('add-employee-marital-status').value,
+                        religion: document.getElementById('add-employee-religion').value,
+                        socialMedia: document.getElementById('add-employee-social-media').value,
+                        hobby: document.getElementById('add-employee-hobby').value,
+                        favorite: document.getElementById('add-employee-favorite').value,
+                        lastEducation: document.getElementById('add-employee-last-education').value,
+                        medicalHistory: document.getElementById('add-employee-medical-history').value,
+                        pangkatGol: document.getElementById('add-employee-pangkat-gol').value,
+                        tanggalMutasi: document.getElementById('add-employee-tanggal-mutasi').value,
+                        ukuranKaos: document.getElementById('add-employee-ukuran-kaos').value,
+                        photo: photoData,
+                        coords: [
+                            parseFloat(document.getElementById('add-employee-lat').value), 
+                            parseFloat(document.getElementById('add-employee-lng').value)
+                        ]
+                    };
+
+                    employees.push(newEmployee);
+                    saveEmployeesToDB();
+                    applyFiltersAndSort();
+                    closeAddEmployeeModal();
+                    showMessage('Sukses', 'Data pegawai baru berhasil ditambahkan.');
+                });
+
+                // --- CONFIRMATION MODAL LOGIC ---
+                const confirmModal = document.getElementById('confirm-modal');
+                const cancelConfirmBtn = document.getElementById('cancel-confirm-btn');
+                const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+                deleteEmployeeBtn.addEventListener('click', () => {
+                    const emp = employees.find(e => e.id === currentEditingEmployeeId);
+                    if (emp) {
+                        document.getElementById('confirm-content').textContent = `Apakah Anda yakin ingin menghapus data pegawai: ${emp.name}? Tindakan ini tidak dapat diurungkan.`;
+                        confirmModal.classList.remove('hidden');
+                    }
+                });
+
+                cancelConfirmBtn.addEventListener('click', () => {
+                    confirmModal.classList.add('hidden');
+                });
+
+                confirmDeleteBtn.addEventListener('click', () => {
+                    const employeeIndex = employees.findIndex(e => e.id === currentEditingEmployeeId);
+                    if (employeeIndex > -1) {
+                        employees.splice(employeeIndex, 1);
+                        saveEmployeesToDB();
+                        
+                        confirmModal.classList.add('hidden');
+                        closeEditEmployeeModal();
+                        hideProfile();
+                        
+                        applyFiltersAndSort();
+                        
+                        showMessage('Sukses', 'Data pegawai berhasil dihapus.');
+                    } else {
+                        showMessage('Error', 'Gagal menghapus data. Pegawai tidak ditemukan.');
+                    }
+                });
+
+
+                // --- LOGIKA EKSPOR & IMPOR ---
+                const importBtn = document.getElementById('import-data-btn');
+                const exportBtn = document.getElementById('export-data-btn');
+                const fileInput = document.getElementById('import-file-input');
+
+                importBtn.addEventListener('click', () => fileInput.click());
+                fileInput.addEventListener('change', handleImport);
+                exportBtn.addEventListener('click', exportDataToExcel);
+
+                function exportDataToExcel() {
+                    const dataForExport = employees.map(emp => {
+                        const { photo, coords, ...rest } = emp;
+                        return {
+                            ...rest,
+                            latitude: coords[0],
+                            longitude: coords[1]
+                        };
+                    });
+
+                    const worksheet = XLSX.utils.json_to_sheet(dataForExport);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "Data Pegawai");
+                    XLSX.writeFile(workbook, "DataPegawai.xlsx");
+                }
+
+                function handleImport(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const sheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[sheetName];
+                            const importedData = XLSX.utils.sheet_to_json(worksheet);
+
+                            if (importedData.length === 0) {
+                                showMessage('Gagal', 'File Excel kosong atau format tidak sesuai.');
+                                return;
+                            }
+
+                            const newEmployees = importedData.map(row => {
+                                const newId = employees.length > 0 ? Math.max(...employees.map(emp => emp.id)) + 1 + employees.length : 1 + employees.length;
+                                return {
+                                    id: row.id || newId,
+                                    name: row.name || 'Nama Tidak Ada',
+                                    nickname: row.nickname || '',
+                                    position: row.position || '',
+                                    address: row.address || 'Alamat Tidak Ada',
+                                    birthplace: row.birthplace || '',
+                                    dob: row.dob || '1970-01-01',
+                                    phone: row.phone || '',
+                                    bloodType: row.bloodType || '',
+                                    maritalStatus: row.maritalStatus || '',
+                                    religion: row.religion || '',
+                                    socialMedia: row.socialMedia || '',
+                                    hobby: row.hobby || '',
+                                    favorite: row.favorite || '',
+                                    lastEducation: row.lastEducation || '',
+                                    medicalHistory: row.medicalHistory || '',
+                                    pangkatGol: row.pangkatGol || '',
+                                    tanggalMutasi: row.tanggalMutasi || '',
+                                    ukuranKaos: row.ukuranKaos || '',
+                                    photo: 'https://placehold.co/100x100/EBF4FF/3B82F6?text=Foto',
+                                    coords: [parseFloat(row.latitude) || office.coords[0], parseFloat(row.longitude) || office.coords[1]]
+                                };
+                            });
+                            
+                            employees.push(...newEmployees);
+                            saveEmployeesToDB();
+                            applyFiltersAndSort();
+                            showMessage('Sukses', `${newEmployees.length} data pegawai berhasil diimpor.`);
+                        } catch (error) {
+                             console.error("Error importing file: ", error);
+                             showMessage('Error', 'Gagal memproses file. Pastikan format file benar.');
+                        } finally {
+                            fileInput.value = '';
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+
+
+                // --- EVENT LISTENERS LAINNYA & RENDER AWAL ---
+                document.getElementById('close-profile-btn').addEventListener('click', hideProfile);
+                document.querySelectorAll('.sort-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const sortType = btn.id.split('-')[1];
+                        if (currentSort === sortType) {
+                            currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+                        } else {
+                            currentSort = sortType;
+                            currentSortOrder = 'asc';
+                        }
+                        applyFiltersAndSort();
+                    });
+                });
+                document.getElementById('filter-birthplace').addEventListener('input', (e) => { filterBirthplace = e.target.value; applyFiltersAndSort(); });
+                document.getElementById('filter-hobby').addEventListener('input', (e) => { filterHobby = e.target.value; applyFiltersAndSort(); });
+                document.getElementById('clear-filter-btn').addEventListener('click', () => {
+                    currentSort = 'name'; currentSortOrder = 'asc'; filterBirthplace = ''; filterHobby = '';
+                    document.getElementById('filter-birthplace').value = '';
+                    document.getElementById('filter-hobby').value = '';
+                    applyFiltersAndSort();
+                });
+                
+                const showMapViewBtn = document.getElementById('show-map-view');
+                const showGraphViewBtn = document.getElementById('show-graph-view');
+                const mapView = document.getElementById('map-view');
+                const graphView = document.getElementById('graph-view');
+                showMapViewBtn.addEventListener('click', () => { mapView.classList.remove('hidden'); graphView.classList.add('hidden'); showMapViewBtn.classList.add('active-view-btn'); showGraphViewBtn.classList.remove('active-view-btn'); setTimeout(() => map.invalidateSize(), 100); });
+                showGraphViewBtn.addEventListener('click', () => { graphView.classList.remove('hidden'); mapView.classList.add('hidden'); showGraphViewBtn.classList.add('active-view-btn'); showMapViewBtn.classList.remove('active-view-btn'); renderCharts(employees); });
+                
+                document.getElementById('employee-photo-upload').addEventListener('change', function() {
+                    const file = this.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            document.getElementById('employee-photo-preview').src = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+                document.getElementById('add-employee-photo-upload').addEventListener('change', function() {
+                     if (this.files && this.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            document.getElementById('add-employee-photo-preview').src = e.target.result;
+                        };
+                        reader.readAsDataURL(this.files[0]);
+                    }
+                });
+
+                // --- Initial Render ---
+                loadEmployeesFromDB();
+                applyFiltersAndSort();
+                renderOfficeHeader();
+            }
+        });
+    </script>
+
+</body>
+</html>
+
